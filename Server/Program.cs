@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -12,27 +12,27 @@ namespace Server
 
         static void Main(string[] args)
         {
-            //---listen at the specified IP and port no.---
+            //Ouve no IP e porta expecificado
             IPAddress localAdd = IPAddress.Parse(SERVER_IP);
             TcpListener listener = new TcpListener(localAdd, PORT_NO);
             Console.WriteLine("Listening...");
             listener.Start();
 
-            //---incoming client connected---
+            //Cliente de entrada conectado
             TcpClient client = listener.AcceptTcpClient();
 
-            //---get the incoming data through a network stream---
+            //Obtem dados de entrada
             NetworkStream nwStream = client.GetStream();
             byte[] buffer = new byte[client.ReceiveBufferSize];
 
-            //---read incoming stream---
+            //Le fluxo de entrada
             int bytesRead = nwStream.Read(buffer, 0, client.ReceiveBufferSize);
 
-            //---convert the data received into a string---
+            //Converte dados de entrada para string
             string dataReceived = Encoding.ASCII.GetString(buffer, 0, bytesRead);
             Console.WriteLine("Received : " + dataReceived);
 
-            //---write back the text to the client---
+            //Escreve texto de volta para o cliente
             Console.WriteLine("Sending back : " + dataReceived);
             nwStream.Write(buffer, 0, bytesRead);
             client.Close();
