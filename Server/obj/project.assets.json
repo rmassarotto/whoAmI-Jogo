@@ -688,7 +688,8 @@
     ]
   },
   "packageFolders": {
-    "/home/rodrigo/.nuget/packages/": {}
+    "/root/.nuget/packages/": {},
+    "/usr/lib64/dotnet/sdk/NuGetFallbackFolder": {}
   },
   "project": {
     "version": "1.0.0",
@@ -696,11 +697,14 @@
       "projectUniqueName": "/home/rodrigo/Documentos/Faculdade/LP/2019-1/whoAmI-Jogo/Server/Server.csproj",
       "projectName": "Server",
       "projectPath": "/home/rodrigo/Documentos/Faculdade/LP/2019-1/whoAmI-Jogo/Server/Server.csproj",
-      "packagesPath": "/home/rodrigo/.nuget/packages/",
+      "packagesPath": "/root/.nuget/packages/",
       "outputPath": "/home/rodrigo/Documentos/Faculdade/LP/2019-1/whoAmI-Jogo/Server/obj/",
       "projectStyle": "PackageReference",
+      "fallbackFolders": [
+        "/usr/lib64/dotnet/sdk/NuGetFallbackFolder"
+      ],
       "configFilePaths": [
-        "/home/rodrigo/.nuget/NuGet/NuGet.Config"
+        "/root/.nuget/NuGet/NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "netcoreapp2.2"

@@ -1,43 +1,118 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-namespace Server
+namespace MultiServer
 {
     class Program
     {
-        const int PORT_NO = 5000;
-        const string SERVER_IP = "127.0.0.1";
+        private static readonly Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        private static readonly List<Socket> clientSockets = new List<Socket>();
+        private const int BUFFER_SIZE = 2048;
+        private const int PORT = 100;
+        private static readonly byte[] buffer = new byte[BUFFER_SIZE];
 
-        static void Main(string[] args)
+        static void Main()
         {
-            //Ouve no IP e porta expecificado
-            IPAddress localAdd = IPAddress.Parse(SERVER_IP);
-            TcpListener listener = new TcpListener(localAdd, PORT_NO);
-            Console.WriteLine("Listening...");
-            listener.Start();
+            Console.Title = "Server";
+            SetupServer();
+            Console.ReadLine(); // When we press enter close everything
+            CloseAllSockets();
+        }
 
-            //Cliente de entrada conectado
-            TcpClient client = listener.AcceptTcpClient();
+        private static void SetupServer()
+        {
+            Console.WriteLine("Setting up server...");
+            serverSocket.Bind(new IPEndPoint(IPAddress.Any, PORT));
+            serverSocket.Listen(0);
+            serverSocket.BeginAccept(AcceptCallback, null);
+            Console.WriteLine("Server setup complete");
+        }
 
-            //Obtem dados de entrada
-            NetworkStream nwStream = client.GetStream();
-            byte[] buffer = new byte[client.ReceiveBufferSize];
+        /// <summary>
+        /// Close all connected client (we do not need to shutdown the server socket as its connections
+        /// are already closed with the clients).
+        /// </summary>
+        private static void CloseAllSockets()
+        {
+            foreach (Socket socket in clientSockets)
+            {
+                socket.Shutdown(SocketShutdown.Both);
+                socket.Close();
+            }
 
-            //Le fluxo de entrada
-            int bytesRead = nwStream.Read(buffer, 0, client.ReceiveBufferSize);
+            serverSocket.Close();
+        }
 
-            //Converte dados de entrada para string
-            string dataReceived = Encoding.ASCII.GetString(buffer, 0, bytesRead);
-            Console.WriteLine("Received : " + dataReceived);
+        private static void AcceptCallback(IAsyncResult AR)
+        {
+            Socket socket;
 
-            //Escreve texto de volta para o cliente
-            Console.WriteLine("Sending back : " + dataReceived);
-            nwStream.Write(buffer, 0, bytesRead);
-            client.Close();
-            listener.Stop();
-            Console.ReadLine();
+            try
+            {
+                socket = serverSocket.EndAccept(AR);
+            }
+            catch (ObjectDisposedException) // I cannot seem to avoid this (on exit when properly closing sockets)
+            {
+                return;
+            }
+
+           clientSockets.Add(socket);
+           socket.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
+           Console.WriteLine("Client connected, waiting for request...");
+           serverSocket.BeginAccept(AcceptCallback, null);
+        }
+
+        private static void ReceiveCallback(IAsyncResult AR)
+        {
+            Socket current = (Socket)AR.AsyncState;
+            int received;
+
+            try
+            {
+                received = current.EndReceive(AR);
+            }
+            catch (SocketException)
+            {
+                Console.WriteLine("Client forcefully disconnected");
+                // Don't shutdown because the socket may be disposed and its disconnected anyway.
+                current.Close(); 
+                clientSockets.Remove(current);
+                return;
+            }
+
+            byte[] recBuf = new byte[received];
+            Array.Copy(buffer, recBuf, received);
+            string text = Encoding.ASCII.GetString(recBuf);
+            Console.WriteLine("Received Text: " + text);
+
+            if (text.ToLower() == "get time") // Client requested time
+            {
+                Console.WriteLine("Text is a get time request");
+                byte[] data = Encoding.ASCII.GetBytes(DateTime.Now.ToLongTimeString());
+                current.Send(data);
+                Console.WriteLine("Time sent to client");
+            }
+            else if (text.ToLower() == "exit") // Client wants to exit gracefully
+            {
+                // Always Shutdown before closing
+                current.Shutdown(SocketShutdown.Both);
+                current.Close();
+                clientSockets.Remove(current);
+                Console.WriteLine("Client disconnected");
+                return;
+            }
+            else
+            {
+                Console.WriteLine("Text is an invalid request");
+                byte[] data = Encoding.ASCII.GetBytes("Invalid request");
+                current.Send(data);
+                Console.WriteLine("Warning Sent");
+            }
+
+            current.BeginReceive(buffer, 0, BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
         }
     }
 }
