@@ -1,100 +1,73 @@
 ﻿using System;
+using System.IO;
 using System.Net.Sockets;
-using System.Net;
-using System.Text;
+using System.Threading;
 
-namespace MultiClient
-{
-    class Program
-    {
-        private static readonly Socket ClientSocket = new Socket
-            (AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+class Cliente {
+    private static TcpClient client;
+    private static StreamReader ins;
+    private static StreamWriter ots;
+    
 
-        private const int PORT = 5000;
+    static void Main(string[] args) {
 
-        static void Main()
-        {
-            Console.Title = "Cliente";
-            ConnectToServer();
-            RequestLoop();
-            Exit();
+        Console.Title = "Cliente";
+
+        try {
+            client = new TcpClient("127.0.0.1", 7777);
+            ins = new StreamReader(client.GetStream());
+            ots = new StreamWriter(client.GetStream());
+            ots.AutoFlush = true;
+        } catch (Exception e) {
+            Console.WriteLine(e.ToString());
         }
 
-        private static void ConnectToServer()
-        {
-            while (!ClientSocket.Connected)
-            {
-                try
-                {
-                    ClientSocket.Connect(IPAddress.Loopback, PORT);
+        if (client != null && ots != null && ins != null) {
+            try {
+                cThread cli = new cThread(client, ins, ots);
+                Thread ctThread = new Thread(cli.run);
+                ctThread.Start();
+
+                while (!cli.closed) {
+                    string msg = Console.ReadLine().Trim();
+                    ots.WriteLine(msg);
                 }
-                catch (SocketException) 
-                {
-                    Console.Clear();
-                }
+                ots.Close();
+                ins.Close();
+                client.Close();
+            } catch (Exception e) {
+                Console.WriteLine(e.ToString());
             }
-
-            Console.Clear();
-            Console.WriteLine("Conectado");
-        }
-
-        private static void RequestLoop()
-        {
-            ReceiveResponse();
-            ReceiveResponse();
-            ReceiveResponse();
-
-            SendRequest();
-
-
-            while (true)
-            {
-                ReceiveResponse();
-                SendRequest();
-            }
-        }
-
-        private static void SendRequest()
-        {
-            Console.Write("-> ");
-            string request = Console.ReadLine();
-            SendString(request);
-
-            if (request.ToLower() == "exit")
-            {
-                Exit();
-            }
-        }
-
-        private static void SendString(string text)
-        {
-            byte[] buffer = Encoding.ASCII.GetBytes(text);
-            ClientSocket.Send(buffer, 0, buffer.Length, SocketFlags.None);
-
-        }
-
-        private static void ReceiveResponse()
-        {
-            var buffer = new byte[2048];
-            int received = ClientSocket.Receive(buffer, SocketFlags.None);
-
-            if (received == 0)
-            {
-                return;
-            }
-
-            var data = new byte[received];
-            Array.Copy(buffer, data, received);
-            string text = Encoding.ASCII.GetString(data);
-            Console.WriteLine(text);
-        }
-
-        private static void Exit()
-        {
-            SendString("exit"); // Tell the server we are exiting
-            ClientSocket.Shutdown(SocketShutdown.Both);
-            ClientSocket.Close();
-            Environment.Exit(0);
         }
     }
+}
+
+class cThread {
+
+    public bool closed = false;
+    private TcpClient client;
+    private StreamReader ins;
+    private StreamWriter ots;
+
+    public cThread(TcpClient client, StreamReader ins, StreamWriter ots) {
+        this.client = client;
+        this.ins = ins;
+        this.ots = ots;
+    } 
+    
+    public void run() {
+        String responseLine;
+        try {
+            while((responseLine = ins.ReadLine()) != null) {
+                Console.WriteLine(responseLine);
+                if(responseLine.IndexOf("*** Ate logo") != -1) {
+                    break;
+                }
+            }
+            closed = true;
+        } catch (Exception e) {
+            Console.WriteLine(e.ToString());
+        }
+        Environment.Exit(0);
+    } 
 }
